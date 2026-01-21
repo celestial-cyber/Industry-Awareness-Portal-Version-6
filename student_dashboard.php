@@ -76,9 +76,9 @@ if (isset($_GET['logout'])) {
     <link rel="stylesheet" href="theme.css">
     <style>
         :root {
-            --primary-color: #6366f1;
-            --primary-light: #e0e7ff;
-            --primary-dark: #4f46e5;
+            --primary-color: #7c3aed;
+            --primary-light: #f3e8ff;
+            --primary-dark: #5b21b6;
             --secondary-color: #f8fafc;
             --accent-color: #10b981;
             --text-primary: #1e293b;
@@ -185,7 +185,7 @@ if (isset($_GET['logout'])) {
             padding: 0 24px;
         }
         .navbar-custom {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             box-shadow: var(--shadow-lg);
             backdrop-filter: blur(10px);
         }
@@ -562,11 +562,7 @@ if (isset($_GET['logout'])) {
 
         /* Footer */
         .dashboard-footer {
-           background: linear-gradient(
-                        135deg,
-                         #f5f7ff 0%,
-                         #eef2ff 100%
-                        );
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             text-align: center;
             padding: 20px;
@@ -700,23 +696,23 @@ if (isset($_GET['logout'])) {
             <div style="display: flex; align-items: center; gap: 12px;">
                 <img src="images/SA Main logo.jpg" alt="SA Main Logo" title="SA Main">
                 <div style="display: flex; flex-direction: column;">
-                    <span style="font-size: 18px; font-weight: 700; color: var(--primary-color); line-height: 1.2;">SPECANCIENS</span>
-                    <span style="font-size: 14px; font-weight: 700; color: var(--text-secondary); line-height: 1.2;">IAP Portal</span>
+                        <span style="font-size: 18px; font-weight: 700; color: #7c3aed; line-height: 1.2;">SPECANCIENS</span>
+                        <span style="font-size: 14px; font-weight: 700; color: #6b7280; line-height: 1.2;">IAP Portal</span>
                 </div>
             </div>
         </div>
 
         <!-- Navigation Menu -->
         <div class="sidebar-nav" style="margin-top: 20px;">
-            <a href="?view=dashboard" class="sidebar-link <?php echo (!isset($_GET['view']) || $_GET['view'] == 'dashboard') ? 'active' : ''; ?>" style="display: block; padding: 12px 15px; margin-bottom: 5px; text-decoration: none; color: #666; border-radius: 8px; transition: all 0.3s;">
+            <a href="?view=dashboard" class="sidebar-link <?php echo (!isset($_GET['view']) || $_GET['view'] == 'dashboard') ? 'active' : ''; ?>">
                 <i class="fas fa-home"></i> Dashboard
             </a>
 
-            <a href="?view=register_session" class="sidebar-link <?php echo (isset($_GET['view']) && $_GET['view'] == 'register_session') ? 'active' : ''; ?>" style="display: block; padding: 12px 15px; margin-bottom: 5px; text-decoration: none; color: #666; border-radius: 8px; transition: all 0.3s;">
+            <a href="?view=register_session" class="sidebar-link <?php echo (isset($_GET['view']) && $_GET['view'] == 'register_session') ? 'active' : ''; ?>">
                 <i class="fas fa-plus-circle"></i> Register for Session
             </a>
 
-            <a href="?view=view_progress" class="sidebar-link <?php echo (isset($_GET['view']) && $_GET['view'] == 'view_progress') ? 'active' : ''; ?>" style="display: block; padding: 12px 15px; margin-bottom: 5px; text-decoration: none; color: #666; border-radius: 8px; transition: all 0.3s;">
+            <a href="?view=view_progress" class="sidebar-link <?php echo (isset($_GET['view']) && $_GET['view'] == 'view_progress') ? 'active' : ''; ?>">
                 <i class="fas fa-chart-line"></i> View Progress
             </a>
         </div>
