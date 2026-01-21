@@ -562,7 +562,7 @@ if (isset($_GET['logout'])) {
 
         /* Footer */
         .dashboard-footer {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 0%);
             color: white;
             text-align: center;
             padding: 20px;
@@ -611,7 +611,7 @@ if (isset($_GET['logout'])) {
         .dashboard-footer {
             text-align: center;
             padding: 30px 20px;
-            color: #6b7280;
+            color: #fcfcfc;
             font-size: 14px;
             border-top: 1px solid #e5e7eb;
             margin-top: 50px;
