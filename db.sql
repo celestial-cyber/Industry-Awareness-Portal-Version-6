@@ -1,6 +1,7 @@
 CREATE TABLE IAP_users_details (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     role ENUM('admin', 'student') NOT NULL
 );
@@ -17,7 +18,14 @@ CREATE TABLE session_registrations (
     submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO IAP_users_details (username, password, role) VALUES
-('admin', '$2y$10$ACnHZm1VvA1MkO8OmoKv4uOtl4jfdX9F1qFcP4e..e6yugwmvVtxm', 'admin'),
-('student', '$2y$10$CNJkUZleu1weUMmlYLUTSOnxRtcHBjTjUXOElIPdhTDu5pZHtPLYC', 'student');
+CREATE TABLE sessions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    topic VARCHAR(255) NOT NULL,
+    year ENUM('1', '2', '3', '4') NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO IAP_users_details (username, email, password, role) VALUES
+('admin', 'admin@example.com', '$2y$10$xHDNFM0xYFstLYe.BIHMUu4ZxCcEeKOQ3psUy85ZcbsCqdbWUy2Z.', 'admin'),
+('student', 'student@example.com', '$2y$10$CNJkUZleu1weUMmlYLUTSOnxRtcHBjTjUXOElIPdhTDu5pZHtPLYC', 'student');
 

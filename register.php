@@ -2,11 +2,35 @@
 // register.php
 $servername = "localhost";
 $username = "root"; // adjust as needed
-$password = "";
-$dbname = "iap_portal"; // assume database name
+$password = "root@123";
 
 // Create connection
-$conn = new mysqli($servername, $username, $password, $dbname);
+$conn = new mysqli($servername, $username, $password);
+
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Create database if not exists
+$sql = "CREATE DATABASE IF NOT EXISTS iap_portal";
+$conn->query($sql);
+
+// Select the database
+$conn->select_db("iap_portal");
+
+// Create tables if not exist
+$sql = "CREATE TABLE IF NOT EXISTS session_registrations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    roll_number VARCHAR(50) NOT NULL,
+    year ENUM('1', '2', '3', '4') NOT NULL,
+    department VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    session_desired VARCHAR(255) NOT NULL,
+    other_query TEXT,
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);";
+$conn->query($sql);
 
 // Check connection
 if ($conn->connect_error) {

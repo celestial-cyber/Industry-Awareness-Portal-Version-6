@@ -3,6 +3,74 @@
 if (isset($_GET['success'])) {
     echo "<script>alert('Registration successful!');</script>";
 }
+
+// Fetch sessions from database
+$servername = "localhost";
+$username = "root";
+$password_db = "root@123";
+
+$conn = new mysqli($servername, $username, $password_db);
+
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Create database if not exists
+$sql = "CREATE DATABASE IF NOT EXISTS iap_portal";
+$conn->query($sql);
+
+// Select the database
+$conn->select_db("iap_portal");
+
+// Create tables if not exist
+$sql = "CREATE TABLE IF NOT EXISTS IAP_users_details (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    role ENUM('admin', 'student') NOT NULL
+);";
+$conn->query($sql);
+
+$sql = "CREATE TABLE IF NOT EXISTS session_registrations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    roll_number VARCHAR(50) NOT NULL,
+    year ENUM('1', '2', '3', '4') NOT NULL,
+    department VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    session_desired VARCHAR(255) NOT NULL,
+    other_query TEXT,
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);";
+$conn->query($sql);
+
+$sql = "CREATE TABLE IF NOT EXISTS sessions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    topic VARCHAR(255) NOT NULL,
+    year ENUM('1', '2', '3', '4') NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);";
+$conn->query($sql);
+
+// Insert default admin if not exists
+$sql = 'INSERT IGNORE INTO IAP_users_details (username, password, role) VALUES (\'admin@sa.com\', \'$2y$10$ACnHZm1VvA1MkO8OmoKv4uOtl4jfdX9F1qFcP4e..e6yugwmvVtxm\', \'admin\')';
+$conn->query($sql);
+
+$sessions = [];
+for ($year = 1; $year <= 4; $year++) {
+    $sql = "SELECT topic FROM sessions WHERE year = ? ORDER BY created_at DESC";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("s", $year);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $sessions[$year] = [];
+    while ($row = $result->fetch_assoc()) {
+        $sessions[$year][] = $row['topic'];
+    }
+    $stmt->close();
+}
+
+$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -392,7 +460,8 @@ if (isset($_GET['success'])) {
             <a href="https://www.specanciens.com">About</a>
             <a href="#years">Modules</a>
             <a href="#contact">Contact</a>
-            <a href ="Admin/admin_dashboard.php">Admin Login</a>
+            <a href ="admin_login.php">Admin Login</a>
+            <a href ="student_login.php">Student Login</a>
         </nav>
     </div>
 </header>
@@ -443,6 +512,9 @@ if (isset($_GET['success'])) {
                     <li>Industry Standards, Ethics & Workplace Communication</li>
                     <li>Roles, Responsibilities & Career Pathways in Industry</li>
                     <li>LinkedIn Profile Basics</li>
+                    <?php foreach ($sessions[1] as $session): ?>
+                        <li><?php echo htmlspecialchars($session); ?></li>
+                    <?php endforeach; ?>
                 </ul>
             </div>
 
@@ -452,16 +524,20 @@ if (isset($_GET['success'])) {
                 <span class="pill pill-green">Skill Building</span><br>
                 <button class="outline-btn toggle-sessions">View Details</button>
                 <ul class="session-list">
-                    <li>Career Awareness Workshop</li>
-                    <li>Communication Skills Seminar</li>
-                    <li>Resume & LinkedIn Basics</li>
-                    <li>Ideathon Introduction</li>
-                    <li>Career Awareness Workshop</li>
-                    <li>Communication Skills Seminar</li>
-                    <li>Resume & LinkedIn Basics</li>
-                    <li>Ideathon Introduction</li>
-                    <li>Resume & LinkedIn Basics</li>
-                    <li>Ideathon Introduction</li>
+                    <li>Resume Building and Career Positioning</li>
+                    <li>LinkedIn Mastery for Students</li>
+                    <li>Interview Preparation Fundamentals</li>
+                    <li>Presentation & Public Skills</li>
+                    <li>Internship Success Strategy</li>
+                    <li>Wokrplace Communication & Etiquette</li>
+                    <li>Building your Personal Brand</li>
+                    <li>Aptitude & Reasoning for Placements</li>
+                    <li>Hackathon Success & Learning</li>
+                    <li>Time Management, Company Opportunities & Certifications</li>
+                  
+                    <?php foreach ($sessions[2] as $session): ?>
+                        <li><?php echo htmlspecialchars($session); ?></li>
+                    <?php endforeach; ?>
                 </ul>
             </div>
 
@@ -481,6 +557,9 @@ if (isset($_GET['success'])) {
                     <li>Advanced Interview Essentials & Preparation Strategy</li>
                     <li>GitHub Portfolio & Open Source Contribution</li>
                     <li>Managing Academics, Placements & Growth</li>
+                    <?php foreach ($sessions[3] as $session): ?>
+                        <li><?php echo htmlspecialchars($session); ?></li>
+                    <?php endforeach; ?>
                 </ul>
             </div>
 
@@ -500,6 +579,9 @@ if (isset($_GET['success'])) {
                     <li>Real-World Project Development</li>
                     <li>Personal Branding & Personal Development</li>
                     <li>Alternative Paths & Contingency Planning</li>
+                    <?php foreach ($sessions[4] as $session): ?>
+                        <li><?php echo htmlspecialchars($session); ?></li>
+                    <?php endforeach; ?>
                 </ul>
             </div>
         </div>
@@ -530,24 +612,7 @@ if (isset($_GET['success'])) {
             <input type="email" id="email" name="email" required>
 
             <label for="session_desired">Session Desired:</label>
-            <select id="session_desired" name="session_desired" required>
-                <option value="Career Awareness Workshop">Career Awareness Workshop</option>
-                <option value="Communication Skills Seminar">Communication Skills Seminar</option>
-                <option value="Resume & LinkedIn Basics">Resume & LinkedIn Basics</option>
-                <option value="Ideathon Introduction">Ideathon Introduction</option>
-                <option value="Hackathon Participation">Hackathon Participation</option>
-                <option value="Coding Platform Training">Coding Platform Training</option>
-                <option value="Certification Guidance">Certification Guidance</option>
-                <option value="Time Management Workshop">Time Management Workshop</option>
-                <option value="Internship Preparation">Internship Preparation</option>
-                <option value="Interview Skills Training">Interview Skills Training</option>
-                <option value="GitHub Portfolio Building">GitHub Portfolio Building</option>
-                <option value="Placement Strategy Session">Placement Strategy Session</option>
-                <option value="Leadership Development">Leadership Development</option>
-                <option value="System Design Workshop">System Design Workshop</option>
-                <option value="Global Opportunities Exploration">Global Opportunities Exploration</option>
-                <option value="Higher Studies Guidance">Higher Studies Guidance</option>
-            </select>
+            <input type="text" id="session_desired" name="session_desired" required>
 
             <label for="other_query">Any Other Query:</label>
             <textarea id="other_query" name="other_query"></textarea>
