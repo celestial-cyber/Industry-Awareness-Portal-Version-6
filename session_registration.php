@@ -55,7 +55,7 @@ echo json_encode([
     'message' => 'Session selected',
     'session_id' => $session_id,
     'session_topic' => $session['topic'],
-    'redirect_url' => 'student_login.php?session=' . $session_id
+    'redirect_url' => 'Student/student_login.php?session=' . $session_id
 ]);
 
 $conn->close();

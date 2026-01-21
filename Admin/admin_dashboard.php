@@ -1,7 +1,7 @@
 <?php
 session_start();
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-    header("Location: ../admin_login.php");
+    header("Location: admin_login.php");
     exit();
 }
 
@@ -81,8 +81,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_session'])) {
     $stmt->close();
 }
 
-if ($page == 'registrations') {
-    $sql = "SELECT * FROM session_registrations ORDER BY submitted_at DESC";
+// Handle status update for session requests
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['request_id']) && isset($_POST['new_status'])) {
+    $request_id = intval($_POST['request_id']);
+    $new_status = $_POST['new_status'];
+
+    $valid_statuses = ['pending', 'reviewed', 'approved', 'rejected'];
+    if (in_array($new_status, $valid_statuses)) {
+        $sql = "UPDATE session_suggestions SET status = ? WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("si", $new_status, $request_id);
+
+        if ($stmt->execute()) {
+            $message = "Status updated successfully!";
+        } else {
+            $message = "Error updating status: " . $conn->error;
+        }
+        $stmt->close();
+    }
+}
+
+if ($page == 'requests') {
+    $sql = "SELECT * FROM session_suggestions ORDER BY submitted_at DESC";
     $result = $conn->query($sql);
 } else if ($page == 'registered_students') {
     // Fetch all students who registered through student_sessions
@@ -101,9 +121,12 @@ if ($page == 'registrations') {
             GROUP BY s.id
             ORDER BY s.created_at DESC";
     $registered_students_result = $conn->query($sql);
+    if (!$registered_students_result) {
+        // Fallback query if the join fails
+        $sql = "SELECT id, full_name, email, roll_number, department, year FROM students ORDER BY created_at DESC";
+        $registered_students_result = $conn->query($sql);
+    }
 }
-
-$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -141,7 +164,7 @@ $conn->close();
         .sidebar-logo {
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             margin-bottom: 30px;
             padding-bottom: 20px;
             border-bottom: 2px solid #f3e8ff;
@@ -290,19 +313,112 @@ $conn->close();
             padding: 40px;
             color: #6b7280;
         }
+
+        /* Statistics Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin: 32px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            border-color: #7c3aed;
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: #7c3aed;
+            background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+            flex-shrink: 0;
+        }
+
+        .stat-content {
+            flex: 1;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 4px;
+            line-height: 1.2;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+                margin: 24px 0;
+            }
+
+            .stat-card {
+                padding: 20px;
+                gap: 14px;
+            }
+
+            .stat-icon {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+
+            .stat-number {
+                font-size: 28px;
+            }
+
+            .stat-label {
+                font-size: 13px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="dashboard">
         <div class="sidebar">
             <div class="sidebar-logo">
-                <img src="../images/SA Main logo.jpg" alt="SA Main Logo" title="SA Main">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <img src="../images/SA Main logo.jpg" alt="SA Main Logo" title="SA Main">
+                    <div style="display: flex; flex-direction: column;">
+                        <span style="font-size: 18px; font-weight: 700; color: #7c3aed; line-height: 1.2;">SPECANCIENS</span>
+                        <span style="font-size: 14px; font-weight: 600; color: #6b7280; line-height: 1.2;">IAP Portal</span>
+                    </div>
+                </div>
             </div>
             <h2>Admin Panel</h2>
             <ul>
                 <li><a href="?page=home" class="<?php echo $page == 'home' ? 'active' : ''; ?>">Home</a></li>
                 <li><a href="?page=create_session" class="<?php echo $page == 'create_session' ? 'active' : ''; ?>">Create Session</a></li>
-                <li><a href="?page=registrations" class="<?php echo $page == 'registrations' ? 'active' : ''; ?>">View Session Registrations</a></li>
+                <li><a href="?page=requests" class="<?php echo $page == 'requests' ? 'active' : ''; ?>">View Session Requests</a></li>
                 <li><a href="?page=registered_students" class="<?php echo $page == 'registered_students' ? 'active' : ''; ?>">View Registered Students</a></li>
             </ul>
         </div>
@@ -323,6 +439,57 @@ $conn->close();
                 <h2 class="section-title">Welcome to Admin Dashboard</h2>
                 <p>Use the sidebar to navigate to different sections.</p>
 
+                <?php
+                // Fetch statistics
+                $total_students = $conn->query("SELECT COUNT(*) as count FROM students")->fetch_assoc()['count'] ?? 0;
+                $total_sessions = $conn->query("SELECT COUNT(*) as count FROM sessions")->fetch_assoc()['count'] ?? 0;
+                $total_registrations = $conn->query("SELECT COUNT(*) as count FROM student_sessions")->fetch_assoc()['count'] ?? 0;
+                $total_quizzes = 0; // Placeholder - implement when quiz table is available
+                ?>
+
+                <!-- Statistics Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo number_format($total_students); ?></div>
+                            <div class="stat-label">Total Students Registered</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo number_format($total_sessions); ?></div>
+                            <div class="stat-label">Total Sessions Created</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-clipboard-list"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo number_format($total_registrations); ?></div>
+                            <div class="stat-label">Total Session Registrations</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-question-circle"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo number_format($total_quizzes); ?></div>
+                            <div class="stat-label">Total Quizzes Taken</div>
+                        </div>
+                    </div>
+                </div>
+
             <?php elseif ($page == 'create_session'): ?>
                 <h2 class="section-title">Create New Session</h2>
                 <form method="post" action="">
@@ -342,9 +509,9 @@ $conn->close();
                     <button type="submit" name="create_session" class="btn">Create Session</button>
                 </form>
 
-            <?php elseif ($page == 'registrations'): ?>
-                <h2 class="section-title">Session Registrations</h2>
-                <?php if ($result->num_rows > 0): ?>
+            <?php elseif ($page == 'requests'): ?>
+                <h2 class="section-title">Session Requests & Suggestions</h2>
+                <?php if ($result && $result->num_rows > 0): ?>
                     <table>
                         <thead>
                             <tr>
@@ -352,10 +519,12 @@ $conn->close();
                                 <th>Name</th>
                                 <th>Roll Number</th>
                                 <th>Year</th>
-                                <th>Department</th>
-                                <th>Email</th>
+                                <th>Branch</th>
+                                <th>Section</th>
                                 <th>Session Desired</th>
                                 <th>Other Query</th>
+                                <th>Status</th>
+                                <th>Actions</th>
                                 <th>Submitted At</th>
                             </tr>
                         </thead>
@@ -366,17 +535,43 @@ $conn->close();
                                     <td><?php echo htmlspecialchars($row['name']); ?></td>
                                     <td><?php echo htmlspecialchars($row['roll_number']); ?></td>
                                     <td><?php echo htmlspecialchars($row['year']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['department']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['email']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['branch']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['section']); ?></td>
                                     <td><?php echo htmlspecialchars($row['session_desired']); ?></td>
                                     <td><?php echo htmlspecialchars($row['other_query']); ?></td>
+                                    <td>
+                                        <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;
+                                            <?php
+                                            switch($row['status']) {
+                                                case 'pending': echo 'background: #fef3c7; color: #92400e;'; break;
+                                                case 'reviewed': echo 'background: #dbeafe; color: #1e40af;'; break;
+                                                case 'approved': echo 'background: #d1fae5; color: #065f46;'; break;
+                                                case 'rejected': echo 'background: #fee2e2; color: #991b1b;'; break;
+                                                default: echo 'background: #f3f4f6; color: #374151;';
+                                            }
+                                            ?>">
+                                            <?php echo ucfirst($row['status']); ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <form method="post" action="" style="display: inline;">
+                                            <input type="hidden" name="request_id" value="<?php echo $row['id']; ?>">
+                                            <select name="new_status" onchange="this.form.submit()" style="padding: 4px; border-radius: 4px; border: 1px solid #d1d5db;">
+                                                <option value="">Change Status</option>
+                                                <option value="pending">Pending</option>
+                                                <option value="reviewed">Reviewed</option>
+                                                <option value="approved">Approved</option>
+                                                <option value="rejected">Rejected</option>
+                                            </select>
+                                        </form>
+                                    </td>
                                     <td><?php echo htmlspecialchars($row['submitted_at']); ?></td>
                                 </tr>
                             <?php endwhile; ?>
                         </tbody>
                     </table>
                 <?php else: ?>
-                    <p class="no-data">No registrations yet.</p>
+                    <p class="no-data">No session requests yet.</p>
                 <?php endif; ?>
 
             <?php elseif ($page == 'registered_students'): ?>
@@ -436,3 +631,6 @@ $conn->close();
     </div>
 </body>
 </html>
+<?php
+$conn->close();
+?>

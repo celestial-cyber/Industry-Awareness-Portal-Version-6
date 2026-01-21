@@ -7,7 +7,7 @@
  */
 
 // Include session protection - must be at the top
-require_once 'includes/student_session_check.php';
+require_once 'Student/student_session_check.php';
 
 $error_message = '';
 $session_data = null;

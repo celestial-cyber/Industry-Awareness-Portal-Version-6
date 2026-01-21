@@ -22,7 +22,7 @@ export const useAuthStore = create((set) => ({
   },
   logout: () => {
     localStorage.removeItem('theme')
-    window.location.href = '../admin_login.php'
+    window.location.href = '../Admin/admin_login.php'
   },
 }))
 

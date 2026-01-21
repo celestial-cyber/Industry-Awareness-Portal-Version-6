@@ -9,7 +9,7 @@ session_start();
 
 // If already logged in as student, redirect to dashboard
 if (isset($_SESSION['student_id']) && isset($_SESSION['email'])) {
-    header("Location: student_dashboard.php");
+    header("Location: ../student_dashboard.php");
     exit();
 }
 
@@ -123,7 +123,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         
                         // If password is still default (not changed), redirect to password reset
                         if (!$student['is_password_changed']) {
-                            header("Location: reset_password.php?first_login=1");
+                            header("Location: ../reset_password.php?first_login=1");
                             exit();
                         } else {
                             // Check if there's a selected session to register for
@@ -138,12 +138,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 $reg_stmt->close();
                                 
                                 // Redirect to session's quiz
-                                header("Location: quiz.php?session_id=" . $session_id);
+                                header("Location: ../quiz.php?session_id=" . $session_id);
                                 exit();
                             }
                             
                             // Password already changed, go to dashboard
-                            header("Location: student_dashboard.php");
+                            header("Location: ../student_dashboard.php");
                             exit();
                         }
                     } else {
@@ -437,7 +437,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
 
             <div class="hero-image">
-                <img src="images/industry awareeness.jpg" alt="Industrial Awareness">
+                <img src="../images/industry_awareness.jpg" alt="Industrial Awareness">
             </div>
         </div>
     </section>

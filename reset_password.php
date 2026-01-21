@@ -9,7 +9,7 @@ session_start();
 
 // Check if student is logged in
 if (!isset($_SESSION['student_id']) || !isset($_SESSION['roll_number'])) {
-    header("Location: student_login.php");
+    header("Location: Student/student_login.php");
     exit();
 }
 

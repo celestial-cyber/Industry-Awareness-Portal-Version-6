@@ -506,6 +506,19 @@ $conn->close();
 
 
 
+    /* Responsive modal adjustments */
+    @media (max-width: 768px) {
+        .modal-content {
+            margin: 1% auto !important;
+            width: 95% !important;
+            max-height: 95vh !important;
+        }
+
+        .modal-body {
+            min-height: 250px !important;
+            padding: 15px !important;
+        }
+    }
     </style>
 </head>
 
@@ -530,8 +543,8 @@ $conn->close();
             <a href="https://www.specanciens.com">About</a>
             <a href="#years">Modules</a>
             <a href="#contact">Contact</a>
-            <a href ="admin_login.php">Admin Login</a>
-            <a href ="student_login.php">Student Login</a>
+            <a href ="Admin/admin_login.php">Admin Login</a>
+            <a href ="Student/student_login.php">Student Login</a>
         </nav>
     </div>
 </header>
@@ -556,7 +569,7 @@ $conn->close();
         </div>
 
         <div class="hero-image">
-            <img src="images/industry awareeness.jpg" alt="Industrial Awareness">
+            <img src="images/industry_awareness.jpg" alt="Industrial Awareness">
         </div>
     </div>
 </section>
@@ -681,6 +694,7 @@ $conn->close();
 
             <label for="year">Year:</label>
             <select id="year" name="year" required>
+                <option value="">-- Select Year --</option>
                 <option value="1">Year 1</option>
                 <option value="2">Year 2</option>
                 <option value="3">Year 3</option>
@@ -694,15 +708,65 @@ $conn->close();
             <input type="email" id="email" name="email" required>
 
             <label for="session_desired">Session Desired:</label>
-            <input type="text" id="session_desired" name="session_desired" required>
+            <select id="session_desired" name="session_desired" required>
+                <option value="">-- Select a year first --</option>
+            </select>
 
             <label for="other_query">Any Other Query:</label>
             <textarea id="other_query" name="other_query"></textarea>
 
             <button type="submit" class="primary-btn">Submit Registration</button>
         </form>
+
+        <!-- Suggest a Session Button -->
+        <div style="text-align: center; margin-top: 30px; padding-top: 30px; border-top: 1px solid #e0e0e0;">
+            <button type="button" class="primary-btn" onclick="openSuggestionModal()" style="background: #7c3aed; margin-bottom: 10px;">Suggest a Session</button>
+            <p style="color: #666; font-size: 14px;">Have a session idea? Let us know what you'd like to learn!</p>
+        </div>
     </div>
 </section>
+
+<!-- Session Suggestion Modal -->
+<div id="suggestionModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div class="modal-content" style="background-color: #fefefe; margin: 2% auto; padding: 0; width: 90%; max-width: 600px; max-height: 90vh; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column;">
+        <div class="modal-header" style="padding: 20px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; color: #7c3aed;">Suggest a Session</h3>
+            <span class="close" onclick="closeSuggestionModal()" style="cursor: pointer; font-size: 28px; font-weight: bold; color: #aaa;">&times;</span>
+        </div>
+        <div class="modal-body" style="padding: 20px; flex: 1; overflow-y: auto; min-height: 300px;">
+            <form action="suggest_session.php" method="post" class="registration-form">
+                <label for="suggestion_name">Name:</label>
+                <input type="text" id="suggestion_name" name="name" required>
+
+                <label for="suggestion_roll_number">Roll Number:</label>
+                <input type="text" id="suggestion_roll_number" name="roll_number" required>
+
+                <label for="suggestion_year">Class (Year):</label>
+                <select id="suggestion_year" name="year" required>
+                    <option value="">-- Select Year --</option>
+                    <option value="1">Year 1</option>
+                    <option value="2">Year 2</option>
+                    <option value="3">Year 3</option>
+                    <option value="4">Year 4</option>
+                </select>
+
+                <label for="suggestion_branch">Branch/Department:</label>
+                <input type="text" id="suggestion_branch" name="branch" required>
+
+                <label for="suggestion_section">Section:</label>
+                <input type="text" id="suggestion_section" name="section" required>
+
+                <label for="suggestion_session_desired">Session You Want:</label>
+                <input type="text" id="suggestion_session_desired" name="session_desired" placeholder="e.g., Advanced Machine Learning, Web Development Workshop" required>
+
+                <label for="suggestion_other_query">Any Other Query/Suggestion:</label>
+                <textarea id="suggestion_other_query" name="other_query" placeholder="Tell us more about your session idea..."></textarea>
+
+                <button type="submit" class="primary-btn" style="width: 100%; margin-top: 20px;">Submit Suggestion</button>
+            </form>
+        </div>
+    </div>
+</div>
 <section id = "contact" class ="section">
     <div class = "container">
         <h2 class="section-title">Contact US</h2>
@@ -844,6 +908,113 @@ document.querySelector('.view-session-info').addEventListener('click', () => {
 document.addEventListener('click', () => {
     contextMenu.classList.remove('show');
 });
+
+// Session data for dynamic dropdown population
+const sessionsData = {
+    '1': [
+        {id: '1', title: 'Introduction to Engineering Careers'},
+        {id: '2', title: 'How to Ace Ideathons'},
+        {id: '3', title: 'What is Problem-Solving?'},
+        {id: '4', title: 'Emerging Technologies Overview'},
+        {id: '5', title: 'Soft Skills: Communication & Teamwork'},
+        {id: '6', title: 'College to Career Transition'},
+        {id: '7', title: 'Resume Building Basics'},
+        {id: '8', title: 'Industry Standards, Ethics & Workplace Communication'},
+        {id: '9', title: 'Roles, Responsibilities & Career Pathways in Industry'},
+        {id: '10', title: 'LinkedIn Profile Basics'}
+    ],
+    '2': [
+        {id: '11', title: 'Resume Building and Career Positioning'},
+        {id: '12', title: 'LinkedIn Mastery for Students'},
+        {id: '13', title: 'Interview Preparation Fundamentals'},
+        {id: '14', title: 'Presentation & Public Skills'},
+        {id: '15', title: 'Internship Success Strategy'},
+        {id: '16', title: 'Workplace Communication & Etiquette'},
+        {id: '17', title: 'Building your Personal Brand'},
+        {id: '18', title: 'Aptitude & Reasoning for Placements'},
+        {id: '19', title: 'Hackathon Success & Learning'},
+        {id: '20', title: 'Time Management, Company Opportunities & Certifications'}
+    ],
+    '3': [
+        {id: '21', title: 'Career Paths Beyond Campus Placements'},
+        {id: '22', title: 'Confidence Building in High-Pressure Situations'},
+        {id: '23', title: 'Project Presentation & Demo Skills'},
+        {id: '24', title: 'Internship to Full-Time Conversion'},
+        {id: '25', title: 'Salary Negotiation & Career Economics'},
+        {id: '26', title: 'Advanced Job Search Strategy & Placement Mastery'},
+        {id: '27', title: 'Core vs Non-Core Career Paths & Specialization'},
+        {id: '28', title: 'Advanced Interview Essentials & Preparation Strategy'},
+        {id: '29', title: 'GitHub Portfolio & Open Source Contribution'},
+        {id: '30', title: 'Managing Academics, Placements & Growth'}
+    ],
+    '4': [
+        {id: '31', title: 'Advanced System Design & Scalability'},
+        {id: '32', title: 'Specialization Deep Dive'},
+        {id: '33', title: 'Startup Ecosystem & Entrepreneurship'},
+        {id: '34', title: 'Research & Innovation in Engineering'},
+        {id: '35', title: 'Advanced Leadership & Management'},
+        {id: '36', title: 'Industry Certifications & Strategic Learning Roadmap'},
+        {id: '37', title: 'Global Opportunities & Remote Work'},
+        {id: '38', title: 'Real-World Project Development'},
+        {id: '39', title: 'Personal Branding & Personal Development'},
+        {id: '40', title: 'Alternative Paths & Contingency Planning'}
+    ]
+};
+
+// Function to populate session dropdown based on selected year
+function populateSessions(year) {
+    const sessionSelect = document.getElementById('session_desired');
+    sessionSelect.innerHTML = '<option value="">-- Select a year first --</option>';
+
+    if (year && sessionsData[year]) {
+        sessionSelect.innerHTML = '<option value="">-- Select a session --</option>';
+        sessionsData[year].forEach(session => {
+            const option = document.createElement('option');
+            option.value = session.id;
+            option.textContent = session.title;
+            sessionSelect.appendChild(option);
+        });
+    }
+}
+
+// Event listener for year selection
+document.getElementById('year').addEventListener('change', function() {
+    const selectedYear = this.value;
+    populateSessions(selectedYear);
+});
+
+// Initialize with no sessions selected
+populateSessions('');
+
+// Modal functions for session suggestions
+function openSuggestionModal() {
+    document.getElementById('suggestionModal').style.display = 'block';
+    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+}
+
+function closeSuggestionModal() {
+    document.getElementById('suggestionModal').style.display = 'none';
+    document.body.style.overflow = 'auto'; // Restore scrolling
+}
+
+// Check for success message on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('suggestion_success') === '1') {
+        alert('Thank you for your session suggestion! We\'ll review it and get back to you soon.');
+        // Clean up the URL
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+    }
+});
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('suggestionModal');
+    if (event.target == modal) {
+        closeSuggestionModal();
+    }
+}
 </script>
 
 

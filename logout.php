@@ -17,10 +17,10 @@ session_destroy();
 // Redirect based on user type
 if ($is_student) {
     // Student logout
-    header("Location: student_login.php?logout=success");
+    header("Location: Student/student_login.php?logout=success");
 } elseif ($is_admin) {
     // Admin logout
-    header("Location: admin_login.php?logout=success");
+    header("Location: Admin/admin_login.php?logout=success");
 } else {
     // Default to home page
     header("Location: index.php");

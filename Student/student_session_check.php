@@ -10,7 +10,7 @@ session_start();
 // Check if student is logged in
 if (!isset($_SESSION['student_id']) || !isset($_SESSION['roll_number'])) {
     // Redirect to student login if not authenticated
-    header("Location: ../student_login.php");
+    header("Location: student_login.php");
     exit();
 }
 
@@ -46,7 +46,7 @@ $result = $stmt->get_result();
 if ($result->num_rows === 0) {
     // Student record not found, invalidate session
     session_destroy();
-    header("Location: ../student_login.php?error=Session expired");
+    header("Location: student_login.php?error=Session expired");
     exit();
 }
 

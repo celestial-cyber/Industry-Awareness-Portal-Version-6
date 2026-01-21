@@ -1,7 +1,7 @@
 <?php
 session_start();
 if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
-    header("Location: Admin/admin_dashboard.php");
+    header("Location: admin_dashboard.php");
     exit();
 }
 
@@ -61,7 +61,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (password_verify($password, $user['password'])) {
             $_SESSION['role'] = 'admin';
             $_SESSION['username'] = $user['username'];
-            header("Location: Admin/admin_dashboard.php");
+            header("Location: admin_dashboard.php");
             exit();
         } else {
             $message = "Invalid password.";
@@ -218,7 +218,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
 
             <div class="hero-image">
-                <img src="images/industry awareeness.jpg" alt="Industrial Awareness">
+                <img src="../images/industry_awareness.jpg" alt="Industrial Awareness">
             </div>
         </div>
     </section>
