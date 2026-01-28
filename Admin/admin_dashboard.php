@@ -106,7 +106,7 @@ if ($page == 'requests') {
     $result = $conn->query($sql);
 } else if ($page == 'registered_students') {
     // Fetch all students who registered through student_sessions
-    $sql = "SELECT DISTINCT 
+    $sql = "SELECT DISTINCT
                 s.id,
                 s.full_name,
                 s.email,
@@ -114,10 +114,13 @@ if ($page == 'requests') {
                 s.department,
                 s.year,
                 COUNT(DISTINCT ss.session_id) as sessions_count,
-                GROUP_CONCAT(DISTINCT sess.topic SEPARATOR ', ') as registered_sessions
+                GROUP_CONCAT(DISTINCT sess.topic SEPARATOR ', ') as registered_sessions,
+                COALESCE(ps.score, 0) as psychometric_score,
+                CASE WHEN ps.score IS NOT NULL THEN 'Completed' ELSE 'Not Taken' END as assessment_status
             FROM students s
             LEFT JOIN student_sessions ss ON s.id = ss.student_id
             LEFT JOIN sessions sess ON ss.session_id = sess.id
+            LEFT JOIN psychometric_scores ps ON s.id = ps.student_id
             GROUP BY s.id
             ORDER BY s.created_at DESC";
     $registered_students_result = $conn->query($sql);
@@ -126,6 +129,22 @@ if ($page == 'requests') {
         $sql = "SELECT id, full_name, email, roll_number, department, year FROM students ORDER BY created_at DESC";
         $registered_students_result = $conn->query($sql);
     }
+} else if ($page == 'psychometric_status') {
+    // Fetch students who have taken the psychometric test
+    $sql_completed = "SELECT s.id, s.full_name, s.email, s.roll_number, s.department, s.year,
+                             ps.score, ps.trait_a, ps.trait_b, ps.trait_c, ps.trait_d, ps.completed_at
+                      FROM students s
+                      INNER JOIN psychometric_scores ps ON s.id = ps.student_id
+                      ORDER BY ps.completed_at DESC";
+    $completed_result = $conn->query($sql_completed);
+
+    // Fetch students who haven't taken the psychometric test
+    $sql_pending = "SELECT s.id, s.full_name, s.email, s.roll_number, s.department, s.year
+                    FROM students s
+                    LEFT JOIN psychometric_scores ps ON s.id = ps.student_id
+                    WHERE ps.student_id IS NULL
+                    ORDER BY s.created_at DESC";
+    $pending_result = $conn->query($sql_pending);
 }
 ?>
 <!DOCTYPE html>
@@ -228,6 +247,40 @@ if ($page == 'requests') {
 
         .logout-btn:hover {
             background: #5b21b6;
+        }
+
+        .check-report-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+            color: #ffffff;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(124, 58, 237, 0.2);
+            border: none;
+            cursor: pointer;
+        }
+
+        .check-report-btn:hover {
+            background: linear-gradient(135deg, #5b21b6 0%, #4c1d95 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(124, 58, 237, 0.3);
+            color: #ffffff;
+            text-decoration: none;
+        }
+
+        .check-report-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(124, 58, 237, 0.2);
+        }
+
+        .check-report-btn i {
+            font-size: 12px;
         }
 
         .section-title {
@@ -374,6 +427,49 @@ if ($page == 'requests') {
         }
 
         /* Responsive adjustments */
+        .psychometric-overview .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+
+        .psychometric-overview .overview-item {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .psychometric-overview .overview-item h4 {
+            margin: 0 0 12px 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .psychometric-overview .progress-bar {
+            background: #e5e7eb;
+            border-radius: 8px;
+            height: 12px;
+            margin-bottom: 8px;
+        }
+
+        .psychometric-overview .progress-fill {
+            background: linear-gradient(90deg, #10b981, #059669);
+            height: 100%;
+            border-radius: 8px;
+            transition: width 0.3s ease;
+        }
+
+        .psychometric-overview .engagement-stats {
+            display: flex;
+            gap: 16px;
+        }
+
+        .psychometric-overview .engagement-stats > div {
+            text-align: center;
+            flex: 1;
+        }
+
         @media (max-width: 768px) {
             .stats-grid {
                 grid-template-columns: 1fr;
@@ -399,6 +495,11 @@ if ($page == 'requests') {
             .stat-label {
                 font-size: 13px;
             }
+
+            .psychometric-overview .overview-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
         }
     </style>
 </head>
@@ -420,6 +521,7 @@ if ($page == 'requests') {
                 <li><a href="?page=create_session" class="<?php echo $page == 'create_session' ? 'active' : ''; ?>">Create Session</a></li>
                 <li><a href="?page=requests" class="<?php echo $page == 'requests' ? 'active' : ''; ?>">View Session Requests</a></li>
                 <li><a href="?page=registered_students" class="<?php echo $page == 'registered_students' ? 'active' : ''; ?>">View Registered Students</a></li>
+                <li><a href="?page=psychometric_status" class="<?php echo $page == 'psychometric_status' ? 'active' : ''; ?>">Check Psychometric Status</a></li>
             </ul>
         </div>
 
@@ -445,6 +547,18 @@ if ($page == 'requests') {
                 $total_sessions = $conn->query("SELECT COUNT(*) as count FROM sessions")->fetch_assoc()['count'] ?? 0;
                 $total_registrations = $conn->query("SELECT COUNT(*) as count FROM student_sessions")->fetch_assoc()['count'] ?? 0;
                 $total_quizzes = 0; // Placeholder - implement when quiz table is available
+
+                // Fetch psychometric statistics
+                $psychometric_completed = $conn->query("SELECT COUNT(*) as count FROM psychometric_scores")->fetch_assoc()['count'] ?? 0;
+                $psychometric_pending = $total_students - $psychometric_completed;
+                $avg_psychometric_score = 0;
+
+                if ($psychometric_completed > 0) {
+                    $avg_result = $conn->query("SELECT AVG(score) as avg_score FROM psychometric_scores")->fetch_assoc();
+                    $avg_psychometric_score = round($avg_result['avg_score'], 1);
+                }
+
+                $psychometric_completion_rate = $total_students > 0 ? round(($psychometric_completed / $total_students) * 100, 1) : 0;
                 ?>
 
                 <!-- Statistics Cards -->
@@ -486,6 +600,93 @@ if ($page == 'requests') {
                         <div class="stat-content">
                             <div class="stat-number"><?php echo number_format($total_quizzes); ?></div>
                             <div class="stat-label">Total Quizzes Taken</div>
+                        </div>
+                    </div>
+
+                    <!-- Psychometric Test Statistics -->
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo number_format($psychometric_completed); ?></div>
+                            <div class="stat-label">Completed Psychometric Tests</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo number_format($psychometric_pending); ?></div>
+                            <div class="stat-label">Pending Psychometric Tests</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #3b82f6, #2563eb);">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo $avg_psychometric_score > 0 ? $avg_psychometric_score . '%' : 'N/A'; ?></div>
+                            <div class="stat-label">Average Psychometric Score</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
+                            <i class="fas fa-percentage"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo $psychometric_completion_rate; ?>%</div>
+                            <div class="stat-label">Test Completion Rate</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Psychometric Overview Section -->
+                <div class="psychometric-overview" style="margin-top: 40px; background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h3 style="color: #5b21b6; margin-bottom: 20px;"><i class="fas fa-chart-pie"></i> Psychometric Assessment Overview</h3>
+
+                    <div class="overview-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+                        <div class="overview-item">
+                            <h4 style="color: #059669; margin-bottom: 12px;"><i class="fas fa-check-circle"></i> Assessment Status</h4>
+                            <div class="progress-bar" style="background: #e5e7eb; border-radius: 8px; height: 12px; margin-bottom: 8px;">
+                                <div class="progress-fill" style="background: linear-gradient(90deg, #10b981, #059669); height: 100%; border-radius: 8px; width: <?php echo $psychometric_completion_rate; ?>%;"></div>
+                            </div>
+                            <p style="margin: 0; font-size: 14px; color: #6b7280;"><?php echo $psychometric_completed; ?> of <?php echo $total_students; ?> students completed (<?php echo $psychometric_completion_rate; ?>%)</p>
+                        </div>
+
+                        <div class="overview-item">
+                            <h4 style="color: #7c3aed; margin-bottom: 12px;"><i class="fas fa-trophy"></i> Performance Insights</h4>
+                            <?php if ($avg_psychometric_score > 0): ?>
+                                <p style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #5b21b6;">Average Score: <?php echo $avg_psychometric_score; ?>%</p>
+                                <p style="margin: 0; font-size: 14px; color: #6b7280;">
+                                    <?php
+                                    if ($avg_psychometric_score >= 80) echo "Excellent performance! Students show strong analytical and organizational skills.";
+                                    elseif ($avg_psychometric_score >= 60) echo "Good performance! Solid analytical and organizational abilities demonstrated.";
+                                    elseif ($avg_psychometric_score >= 40) echo "Moderate performance. Room for development in analytical skills.";
+                                    else echo "Areas for improvement in analytical and organizational skills.";
+                                    ?>
+                                </p>
+                            <?php else: ?>
+                                <p style="margin: 0; font-size: 14px; color: #6b7280;">No assessments completed yet.</p>
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="overview-item">
+                            <h4 style="color: #f59e0b; margin-bottom: 12px;"><i class="fas fa-users"></i> Student Engagement</h4>
+                            <div class="engagement-stats" style="display: flex; gap: 16px;">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 24px; font-weight: 700; color: #059669;"><?php echo $psychometric_completed; ?></div>
+                                    <div style="font-size: 12px; color: #6b7280;">Completed</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 24px; font-weight: 700; color: #f59e0b;"><?php echo $psychometric_pending; ?></div>
+                                    <div style="font-size: 12px; color: #6b7280;">Pending</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -586,8 +787,10 @@ if ($page == 'requests') {
                                 <th>Roll Number</th>
                                 <th>Department</th>
                                 <th>Year</th>
-                                <th>Sessions Registered</th>
+                                <th>Session Count</th>
                                 <th>Registered Sessions</th>
+                                <th>Psychometric Score</th>
+                                <th>Assessment Status</th>
                                 <th>Quizzes Taken</th>
                                 <th>Modules Completed</th>
                             </tr>
@@ -603,9 +806,19 @@ if ($page == 'requests') {
                                     <td>Year <?php echo htmlspecialchars($row['year']); ?></td>
                                     <td><strong><?php echo $row['sessions_count']; ?></strong></td>
                                     <td>
-                                        <small><?php 
-                                            echo $row['registered_sessions'] ? htmlspecialchars($row['registered_sessions']) : '<em>None</em>'; 
+                                        <small><?php
+                                            echo $row['registered_sessions'] ? htmlspecialchars($row['registered_sessions']) : '<em>None</em>';
                                         ?></small>
+                                    </td>
+                                    <td>
+                                        <span style="background: <?php echo $row['psychometric_score'] > 0 ? '#dcfce7' : '#f3f4f6'; ?>; padding: 4px 8px; border-radius: 4px; font-weight: 600; color: <?php echo $row['psychometric_score'] > 0 ? '#166534' : '#6b7280'; ?>;">
+                                            <?php echo $row['psychometric_score'] > 0 ? round($row['psychometric_score'], 1) . '%' : 'N/A'; ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span style="background: <?php echo $row['assessment_status'] == 'Completed' ? '#dcfce7' : '#fef3c7'; ?>; padding: 4px 8px; border-radius: 4px; font-weight: 600; color: <?php echo $row['assessment_status'] == 'Completed' ? '#166534' : '#92400e'; ?>;">
+                                            <?php echo $row['assessment_status']; ?>
+                                        </span>
                                     </td>
                                     <td>
                                         <!-- Dummy value: Random quiz count between 0-5 -->
@@ -625,6 +838,82 @@ if ($page == 'requests') {
                     </table>
                 <?php else: ?>
                     <p class="no-data">No students registered yet through the student portal.</p>
+                <?php endif; ?>
+            <?php elseif ($page == 'psychometric_status'): ?>
+                <h2>Psychometric Assessment Status</h2>
+
+                <!-- Students Who Have Completed the Assessment -->
+                <h3 style="color: #28a745; margin-top: 40px;"><i class="fa fa-check-circle"></i> Students Who Have Completed Assessment</h3>
+                <?php if (isset($completed_result) && $completed_result->num_rows > 0): ?>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Roll Number</th>
+                                <th>Department</th>
+                                <th>Year</th>
+                                <th>Score</th>
+                                <th>Completed Date</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php while($row = $completed_result->fetch_assoc()): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($row['id']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['full_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['email']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['roll_number']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['department']); ?></td>
+                                    <td>Year <?php echo htmlspecialchars($row['year']); ?></td>
+                                    <td><strong style="color: #28a745;"><?php echo round($row['score'], 1); ?>%</strong></td>
+                                    <td><?php echo date('M j, Y H:i', strtotime($row['completed_at'])); ?></td>
+                                    <td>
+                                        <a href="psychometric_report.php?student_id=<?php echo $row['id']; ?>" class="check-report-btn">
+                                            <i class="fa fa-file-text"></i> Check Report
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
+                <?php else: ?>
+                    <p class="no-data">No students have completed the psychometric assessment yet.</p>
+                <?php endif; ?>
+
+                <!-- Students Who Haven't Taken the Assessment -->
+                <h3 style="color: #dc3545; margin-top: 40px;"><i class="fa fa-times-circle"></i> Students Who Haven't Taken Assessment</h3>
+                <?php if (isset($pending_result) && $pending_result->num_rows > 0): ?>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Roll Number</th>
+                                <th>Department</th>
+                                <th>Year</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php while($row = $pending_result->fetch_assoc()): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($row['id']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['full_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['email']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['roll_number']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['department']); ?></td>
+                                    <td>Year <?php echo htmlspecialchars($row['year']); ?></td>
+                                    <td><span style="color: #dc3545; font-weight: bold;">Not Taken</span></td>
+                                </tr>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
+                <?php else: ?>
+                    <p class="no-data">All students have completed the psychometric assessment!</p>
                 <?php endif; ?>
             <?php endif; ?>
         </div>

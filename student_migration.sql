@@ -120,3 +120,22 @@ INSERT IGNORE INTO session_suggestions (name, roll_number, year, branch, section
 VALUES
 ('Sample Student', '2021001', '1', 'Computer Science', 'A', 'Advanced Python Programming', 'Would love to learn more about data structures and algorithms', 'pending'),
 ('Another Student', '2021002', '2', 'Information Technology', 'B', 'Machine Learning Workshop', 'Interested in AI and ML applications', 'reviewed');
+
+-- Add password reset columns to students table
+ALTER TABLE students
+ADD COLUMN reset_token VARCHAR(255) NULL,
+ADD COLUMN reset_token_expiry DATETIME NULL;
+
+-- Create psychometric_scores table for storing assessment results
+CREATE TABLE IF NOT EXISTS psychometric_scores (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    score DECIMAL(5,2) NOT NULL,
+    trait_a INT DEFAULT 0,
+    trait_b INT DEFAULT 0,
+    trait_c INT DEFAULT 0,
+    trait_d INT DEFAULT 0,
+    completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_student_psychometric (student_id)
+);

@@ -61,6 +61,216 @@ if (isset($_GET['logout'])) {
     header("Location: Student/student_login.php");
     exit();
 }
+
+// Handle profile update request
+$profile_message = '';
+$profile_message_type = '';
+
+if (isset($_POST['update_profile'])) {
+    $full_name = trim($_POST['full_name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $roll_number = trim($_POST['roll_number'] ?? '');
+    $department = trim($_POST['department'] ?? '');
+    $year = $_POST['year'] ?? '';
+    $phone = trim($_POST['phone'] ?? '');
+    $current_password = $_POST['current_password'] ?? '';
+
+    // Validate input
+    if (empty($full_name) || empty($email) || empty($roll_number) || empty($department) || empty($year) || empty($current_password)) {
+        $profile_message = 'All required fields must be filled.';
+        $profile_message_type = 'danger';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $profile_message = 'Please enter a valid email address.';
+        $profile_message_type = 'danger';
+    } elseif (!in_array($year, ['1', '2', '3', '4'])) {
+        $profile_message = 'Please select a valid year.';
+        $profile_message_type = 'danger';
+    } else {
+        try {
+            // Verify current password
+            $sql = "SELECT password FROM students WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("i", $_SESSION['student_id']);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($result->num_rows > 0) {
+                $student = $result->fetch_assoc();
+
+                if (password_verify($current_password, $student['password'])) {
+                    // Check if roll number is already taken by another student
+                    $roll_check_sql = "SELECT id FROM students WHERE roll_number = ? AND id != ?";
+                    $roll_check_stmt = $conn->prepare($roll_check_sql);
+                    $roll_check_stmt->bind_param("si", $roll_number, $_SESSION['student_id']);
+                    $roll_check_stmt->execute();
+                    $roll_check_result = $roll_check_stmt->get_result();
+
+                    if ($roll_check_result->num_rows > 0) {
+                        $profile_message = 'This roll number is already taken by another student.';
+                        $profile_message_type = 'danger';
+                    } else {
+                        // Check if email is already taken by another student
+                        $email_check_sql = "SELECT id FROM students WHERE email = ? AND id != ?";
+                        $email_check_stmt = $conn->prepare($email_check_sql);
+                        $email_check_stmt->bind_param("si", $email, $_SESSION['student_id']);
+                        $email_check_stmt->execute();
+                        $email_check_result = $email_check_stmt->get_result();
+
+                        if ($email_check_result->num_rows > 0) {
+                            $profile_message = 'This email address is already registered to another student.';
+                            $profile_message_type = 'danger';
+                        } else {
+                            // Update student profile
+                            $update_sql = "UPDATE students SET full_name = ?, email = ?, roll_number = ?, department = ?, year = ? WHERE id = ?";
+                            $update_stmt = $conn->prepare($update_sql);
+                            $update_stmt->bind_param("sssssi", $full_name, $email, $roll_number, $department, $year, $_SESSION['student_id']);
+
+                            if ($update_stmt->execute()) {
+                                // Update session variables to reflect changes immediately
+                                $_SESSION['full_name'] = $full_name;
+                                $_SESSION['email'] = $email;
+                                $_SESSION['roll_number'] = $roll_number;
+                                $_SESSION['department'] = $department;
+                                $_SESSION['year'] = $year;
+
+                                $profile_message = 'Profile updated successfully!';
+                                $profile_message_type = 'success';
+                            } else {
+                                $profile_message = 'Failed to update profile. Please try again.';
+                                $profile_message_type = 'danger';
+                            }
+
+                            $update_stmt->close();
+                        }
+                        $email_check_stmt->close();
+                    }
+                    $roll_check_stmt->close();
+                } else {
+                    $profile_message = 'Current password is incorrect.';
+                    $profile_message_type = 'danger';
+                }
+            } else {
+                $profile_message = 'Student record not found.';
+                $profile_message_type = 'danger';
+            }
+
+            $stmt->close();
+        } catch (Exception $e) {
+            $profile_message = 'An error occurred: ' . $e->getMessage();
+            $profile_message_type = 'danger';
+        }
+    }
+}
+
+// Handle password reset request
+$reset_message = '';
+$reset_message_type = '';
+
+if (isset($_POST['reset_password'])) {
+    $current_password = $_POST['current_password'] ?? '';
+    $new_password = $_POST['new_password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
+
+    // Validate input
+    if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
+        $reset_message = 'All fields are required.';
+        $reset_message_type = 'danger';
+    } elseif ($new_password !== $confirm_password) {
+        $reset_message = 'New passwords do not match.';
+        $reset_message_type = 'danger';
+    } elseif (strlen($new_password) < 8) {
+        $reset_message = 'New password must be at least 8 characters long.';
+        $reset_message_type = 'danger';
+    } else {
+        try {
+            // Verify current password
+            $sql = "SELECT password FROM students WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("i", $_SESSION['student_id']);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($result->num_rows > 0) {
+                $student = $result->fetch_assoc();
+
+                if (password_verify($current_password, $student['password'])) {
+                    // Generate reset token
+                    $reset_token = bin2hex(random_bytes(32));
+                    $token_expiry = date('Y-m-d H:i:s', strtotime('+1 hour'));
+
+                    // Store reset token in database
+                    $update_sql = "UPDATE students SET reset_token = ?, reset_token_expiry = ? WHERE id = ?";
+                    $update_stmt = $conn->prepare($update_sql);
+                    $update_stmt->bind_param("ssi", $reset_token, $token_expiry, $_SESSION['student_id']);
+
+                    if ($update_stmt->execute()) {
+                        // Send reset email
+                        $student_email = $_SESSION['email'];
+                        $student_name = $_SESSION['full_name'];
+
+                        $subject = "Password Reset Request - IAP Portal";
+                        $reset_link = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']) . "/reset_password_confirm.php?token=" . $reset_token;
+
+                        $message = "
+                        <html>
+                        <head>
+                            <title>Password Reset - IAP Portal</title>
+                        </head>
+                        <body>
+                            <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                                <h2 style='color: #7c3aed;'>Password Reset Request</h2>
+                                <p>Dear {$student_name},</p>
+                                <p>You have requested to reset your password for your IAP Portal account.</p>
+                                <p>Click the button below to confirm and set your new password:</p>
+                                <div style='text-align: center; margin: 30px 0;'>
+                                    <a href='{$reset_link}' style='background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;'>Reset Password</a>
+                                </div>
+                                <p><strong>Important:</strong> This link will expire in 1 hour for security reasons.</p>
+                                <p>If you did not request this password reset, please ignore this email. Your password will remain unchanged.</p>
+                                <hr style='border: none; border-top: 1px solid #eee; margin: 30px 0;'>
+                                <p style='color: #666; font-size: 14px;'>
+                                    This is an automated message from IAP Portal.<br>
+                                    If you're having trouble clicking the button, copy and paste this URL into your browser:<br>
+                                    <a href='{$reset_link}' style='color: #7c3aed;'>{$reset_link}</a>
+                                </p>
+                            </div>
+                        </body>
+                        </html>
+                        ";
+
+                        $headers = "MIME-Version: 1.0" . "\r\n";
+                        $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
+                        $headers .= "From: IAP Portal <noreply@iap-portal.com>" . "\r\n";
+
+                        if (mail($student_email, $subject, $message, $headers)) {
+                            $reset_message = 'Password reset email sent successfully! Please check your email and click the reset link to complete the process.';
+                            $reset_message_type = 'success';
+                        } else {
+                            $reset_message = 'Failed to send reset email. Please try again later or contact support.';
+                            $reset_message_type = 'danger';
+                        }
+                    } else {
+                        $reset_message = 'Failed to process reset request. Please try again.';
+                        $reset_message_type = 'danger';
+                    }
+
+                    $update_stmt->close();
+                } else {
+                    $reset_message = 'Current password is incorrect.';
+                    $reset_message_type = 'danger';
+                }
+            } else {
+                $reset_message = 'Student record not found.';
+                $reset_message_type = 'danger';
+            }
+
+            $stmt->close();
+        } catch (Exception $e) {
+            $reset_message = 'An error occurred: ' . $e->getMessage();
+            $reset_message_type = 'danger';
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -715,6 +925,39 @@ if (isset($_GET['logout'])) {
             <a href="?view=view_progress" class="sidebar-link <?php echo (isset($_GET['view']) && $_GET['view'] == 'view_progress') ? 'active' : ''; ?>">
                 <i class="fas fa-chart-line"></i> View Progress
             </a>
+
+            <a href="?view=edit_profile" class="sidebar-link <?php echo (isset($_GET['view']) && $_GET['view'] == 'edit_profile') ? 'active' : ''; ?>">
+                <i class="fas fa-user-edit"></i> Edit Profile
+            </a>
+
+            <?php
+            // Check if student has taken psychometric test
+            $psychometric_check_sql = "SELECT score FROM psychometric_scores WHERE student_id = ?";
+            $psychometric_check_stmt = $conn->prepare($psychometric_check_sql);
+            $psychometric_check_stmt->bind_param("i", $_SESSION['student_id']);
+            $psychometric_check_stmt->execute();
+            $psychometric_check_result = $psychometric_check_stmt->get_result();
+            $has_taken_test = $psychometric_check_result->num_rows > 0;
+            $psychometric_check_stmt->close();
+            ?>
+
+            <?php if ($has_taken_test): ?>
+                <a href="student_psychometric_report.php" class="sidebar-link" target="_blank">
+                    <i class="fas fa-file-alt"></i> My Psychometric Report
+                </a>
+            <?php else: ?>
+                <a href="?view=take_quiz" class="sidebar-link <?php echo (isset($_GET['view']) && $_GET['view'] == 'take_quiz') ? 'active' : ''; ?>">
+                    <i class="fas fa-brain"></i> Take Psychometric Quiz
+                </a>
+            <?php endif; ?>
+
+            <a href="?view=reset_password" class="sidebar-link <?php echo (isset($_GET['view']) && $_GET['view'] == 'reset_password') ? 'active' : ''; ?>">
+                <i class="fas fa-key"></i> Reset Password
+            </a>
+
+            <a href="https://www.specanciens.com/projectpotal/index1.php" target="_blank" rel="noopener noreferrer" class="sidebar-link">
+                <i class="fas fa-project-diagram"></i> Register for SA Projects
+            </a>
         </div>
     </div>
 
@@ -931,7 +1174,205 @@ if (isset($_GET['logout'])) {
                         <i class="fas fa-info-circle"></i> You haven't registered for any sessions yet. Visit the "Register for Session" section to get started!
                     </div>
                 <?php endif; ?>
-            <?php
+                <?php
+            } elseif ($view == 'edit_profile') {
+                // Edit Profile view
+                ?>
+                <div class="welcome-header">
+                    <h1><i class="fas fa-user-edit"></i> Edit Profile</h1>
+                    <p>Update your personal information and account details.</p>
+                </div>
+
+                <div class="profile-edit-container" style="background: white; border-radius: 16px; box-shadow: var(--shadow); padding: 32px; margin-bottom: 32px;">
+                    <?php if (!empty($profile_message)): ?>
+                        <div class="alert alert-<?php echo $profile_message_type; ?> alert-dismissible fade show" role="alert">
+                            <i class="fas fa-<?php echo $profile_message_type === 'success' ? 'check-circle' : 'exclamation-circle'; ?>"></i>
+                            <?php echo htmlspecialchars($profile_message); ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    <?php endif; ?>
+
+                    <form method="POST" action="?view=edit_profile" id="profileForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="full_name" class="form-label">Full Name</label>
+                                <input type="text" class="form-control" id="full_name" name="full_name" value="<?php echo htmlspecialchars($_SESSION['full_name']); ?>" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="email" name="email" value="<?php echo htmlspecialchars($_SESSION['email']); ?>" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="roll_number" class="form-label">Roll Number</label>
+                                <input type="text" class="form-control" id="roll_number" name="roll_number" value="<?php echo htmlspecialchars($_SESSION['roll_number']); ?>" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="department" class="form-label">Department</label>
+                                <input type="text" class="form-control" id="department" name="department" value="<?php echo htmlspecialchars($_SESSION['department']); ?>" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="year" class="form-label">Year</label>
+                                <select class="form-control" id="year" name="year" required>
+                                    <option value="">Select Year</option>
+                                    <option value="1" <?php echo $_SESSION['year'] == '1' ? 'selected' : ''; ?>>Year 1</option>
+                                    <option value="2" <?php echo $_SESSION['year'] == '2' ? 'selected' : ''; ?>>Year 2</option>
+                                    <option value="3" <?php echo $_SESSION['year'] == '3' ? 'selected' : ''; ?>>Year 3</option>
+                                    <option value="4" <?php echo $_SESSION['year'] == '4' ? 'selected' : ''; ?>>Year 4</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="phone" class="form-label">Phone Number (Optional)</label>
+                                <input type="tel" class="form-control" id="phone" name="phone" placeholder="Enter your phone number">
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label for="current_password" class="form-label">Current Password (Required to save changes)</label>
+                            <input type="password" class="form-control" id="current_password" name="current_password" required>
+                        </div>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> <strong>Note:</strong> You need to enter your current password to update your profile information.
+                        </div>
+                        <div class="d-flex gap-3">
+                            <button type="submit" name="update_profile" class="btn btn-primary" style="background: var(--primary-color); border: none; padding: 12px 24px;">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="location.reload()" style="padding: 12px 24px;">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <?php
+            } elseif ($view == 'take_quiz') {
+                // Take Psychometric Quiz view
+                ?>
+                <div class="welcome-header">
+                    <h1><i class="fas fa-brain"></i> Psychometric Assessment</h1>
+                    <p>Take our comprehensive psychometric assessment to understand your personality traits and career preferences.</p>
+                </div>
+
+                <div class="quiz-container" style="background: white; border-radius: 16px; box-shadow: var(--shadow); padding: 32px; margin-bottom: 32px;">
+                    <div class="quiz-intro text-center mb-4">
+                        <i class="fas fa-clipboard-list fa-4x text-primary mb-3"></i>
+                        <h3>Ready to Begin Your Assessment?</h3>
+                        <p class="text-muted">This psychometric assessment consists of 20 questions designed to evaluate your:</p>
+                        <div class="quiz-features" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 30px 0;">
+                            <div class="feature-item" style="padding: 20px; background: var(--primary-light); border-radius: 12px;">
+                                <i class="fas fa-users text-primary mb-2" style="font-size: 24px;"></i>
+                                <h5>Personality Traits</h5>
+                                <p>Understand your behavioral patterns</p>
+                            </div>
+                            <div class="feature-item" style="padding: 20px; background: var(--primary-light); border-radius: 12px;">
+                                <i class="fas fa-lightbulb text-primary mb-2" style="font-size: 24px;"></i>
+                                <h5>Learning Style</h5>
+                                <p>Discover how you learn best</p>
+                            </div>
+                            <div class="feature-item" style="padding: 20px; background: var(--primary-light); border-radius: 12px;">
+                                <i class="fas fa-briefcase text-primary mb-2" style="font-size: 24px;"></i>
+                                <h5>Career Interests</h5>
+                                <p>Identify suitable career paths</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="quiz-info" style="background: #f8fafc; padding: 24px; border-radius: 12px; margin-bottom: 30px;">
+                        <h5><i class="fas fa-info-circle"></i> Assessment Information</h5>
+                        <ul class="list-unstyled" style="margin: 0;">
+                            <li style="margin-bottom: 8px;"><i class="fas fa-clock text-primary"></i> <strong>Duration:</strong> Approximately 15-20 minutes</li>
+                            <li style="margin-bottom: 8px;"><i class="fas fa-question-circle text-primary"></i> <strong>Questions:</strong> 20 questions selected from our comprehensive bank</li>
+                            <li style="margin-bottom: 8px;"><i class="fas fa-shield-alt text-primary"></i> <strong>Privacy:</strong> Your responses are confidential and used only for assessment</li>
+                            <li style="margin-bottom: 8px;"><i class="fas fa-trophy text-primary"></i> <strong>Results:</strong> Detailed report with trait analysis and career insights</li>
+                            <li style="margin-bottom: 8px;"><i class="fas fa-ban text-warning"></i> <strong>One-time:</strong> This assessment can only be taken once</li>
+                        </ul>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-exclamation-triangle"></i> <strong>Important:</strong> This is a one-time assessment. Once completed, you cannot retake it. Make sure you answer honestly and thoughtfully.
+                    </div>
+
+                    <div class="text-center">
+                        <button class="btn btn-primary btn-lg" style="background: var(--primary-color); border: none; padding: 16px 32px; font-size: 18px;" onclick="startPsychometricQuiz()">
+                            <i class="fas fa-play"></i> Start Psychometric Assessment
+                        </button>
+                        <p class="text-muted mt-3">Make sure you have sufficient time to complete the assessment without interruptions.</p>
+                    </div>
+                </div>
+
+                <?php
+            } elseif ($view == 'reset_password') {
+                // Reset Password view
+                ?>
+                <div class="welcome-header">
+                    <h1><i class="fas fa-key"></i> Reset Password</h1>
+                    <p>Change your account password securely. An email will be sent to your registered email address for verification.</p>
+                </div>
+
+                <div class="reset-password-container" style="background: white; border-radius: 16px; box-shadow: var(--shadow); padding: 32px; margin-bottom: 32px;">
+                    <div class="reset-password-form">
+                        <div class="alert alert-info mb-4">
+                            <i class="fas fa-info-circle"></i> <strong>Password Reset Process:</strong>
+                            <ol class="mb-0 mt-2">
+                                <li>Enter your current password for verification</li>
+                                <li>Enter your new desired password</li>
+                                <li>An email will be sent to <?php echo htmlspecialchars($_SESSION['email']); ?> for confirmation</li>
+                                <li>Click the link in the email to confirm the password change</li>
+                            </ol>
+                        </div>
+
+                        <form method="POST" action="" id="resetPasswordForm">
+                            <div class="mb-4">
+                                <label for="current_password_reset" class="form-label">Current Password</label>
+                                <input type="password" class="form-control" id="current_password_reset" name="current_password" required>
+                                <div class="form-text">Enter your current password to verify your identity.</div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="new_password" class="form-label">New Password</label>
+                                    <input type="password" class="form-control" id="new_password" name="new_password" required minlength="8">
+                                    <div class="form-text">Minimum 8 characters required.</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="confirm_password" class="form-label">Confirm New Password</label>
+                                    <input type="password" class="form-control" id="confirm_password" name="confirm_password" required minlength="8">
+                                    <div class="form-text">Re-enter your new password.</div>
+                                </div>
+                            </div>
+
+                            <div class="password-strength mb-3" id="passwordStrength" style="display: none;">
+                                <small class="text-muted">Password strength: <span id="strengthText">Weak</span></small>
+                                <div class="progress mt-1" style="height: 8px;">
+                                    <div class="progress-bar" id="strengthBar" role="progressbar" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="confirmEmail" required>
+                                    <label class="form-check-label" for="confirmEmail">
+                                        I confirm that I want to receive a password reset email at <?php echo htmlspecialchars($_SESSION['email']); ?>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-3">
+                                <button type="submit" name="reset_password" class="btn btn-primary" style="background: var(--primary-color); border: none; padding: 12px 24px;">
+                                    <i class="fas fa-envelope"></i> Send Reset Email
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="location.reload()" style="padding: 12px 24px;">
+                                    <i class="fas fa-times"></i> Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <?php
             }
             ?>
 
@@ -1019,6 +1460,151 @@ if (isset($_GET['logout'])) {
             });
         }
     }
+
+    // Function to start psychometric quiz
+    function startPsychometricQuiz() {
+        if (confirm('Are you ready to begin the psychometric assessment? This assessment consists of 20 questions and typically takes 15-20 minutes to complete.')) {
+            window.location.href = 'psychometric_quiz.php';
+        }
+    }
+
+    // Password strength checker
+    function checkPasswordStrength(password) {
+        let strength = 0;
+        let feedback = [];
+
+        if (password.length >= 8) strength += 1;
+        if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength += 1;
+        if (password.match(/\d/)) strength += 1;
+        if (password.match(/[^a-zA-Z\d]/)) strength += 1;
+
+        const strengthBar = document.getElementById('strengthBar');
+        const strengthText = document.getElementById('strengthText');
+
+        if (strengthBar && strengthText) {
+            switch(strength) {
+                case 0:
+                case 1:
+                    strengthBar.style.width = '25%';
+                    strengthBar.className = 'progress-bar bg-danger';
+                    strengthText.textContent = 'Weak';
+                    break;
+                case 2:
+                    strengthBar.style.width = '50%';
+                    strengthBar.className = 'progress-bar bg-warning';
+                    strengthText.textContent = 'Fair';
+                    break;
+                case 3:
+                    strengthBar.style.width = '75%';
+                    strengthBar.className = 'progress-bar bg-info';
+                    strengthText.textContent = 'Good';
+                    break;
+                case 4:
+                    strengthBar.style.width = '100%';
+                    strengthBar.className = 'progress-bar bg-success';
+                    strengthText.textContent = 'Strong';
+                    break;
+            }
+        }
+    }
+
+    // Initialize password strength checker for reset password form
+    document.addEventListener('DOMContentLoaded', function() {
+        const newPasswordInput = document.getElementById('new_password');
+        if (newPasswordInput) {
+            newPasswordInput.addEventListener('input', function() {
+                const password = this.value;
+                const strengthDiv = document.getElementById('passwordStrength');
+
+                if (password.length > 0) {
+                    strengthDiv.style.display = 'block';
+                    checkPasswordStrength(password);
+                } else {
+                    strengthDiv.style.display = 'none';
+                }
+            });
+        }
+
+        // Form validation for reset password
+        const resetForm = document.getElementById('resetPasswordForm');
+        if (resetForm) {
+            resetForm.addEventListener('submit', function(e) {
+                const newPassword = document.getElementById('new_password').value;
+                const confirmPassword = document.getElementById('confirm_password').value;
+                const currentPassword = document.getElementById('current_password_reset').value;
+
+                if (!currentPassword) {
+                    e.preventDefault();
+                    alert('Please enter your current password.');
+                    return false;
+                }
+
+                if (newPassword !== confirmPassword) {
+                    e.preventDefault();
+                    alert('New passwords do not match!');
+                    return false;
+                }
+
+                if (newPassword.length < 8) {
+                    e.preventDefault();
+                    alert('New password must be at least 8 characters long!');
+                    return false;
+                }
+
+                // Check if email confirmation is checked
+                const emailConfirm = document.getElementById('confirmEmail');
+                if (emailConfirm && !emailConfirm.checked) {
+                    e.preventDefault();
+                    alert('Please confirm that you want to receive the reset email.');
+                    return false;
+                }
+
+                return confirm('Are you sure you want to reset your password? An email will be sent to your registered email address.');
+            });
+        }
+
+        // Form validation for profile update
+        const profileForm = document.getElementById('profileForm');
+        if (profileForm) {
+            profileForm.addEventListener('submit', function(e) {
+                const fullName = document.getElementById('full_name').value.trim();
+                const email = document.getElementById('email').value.trim();
+                const rollNumber = document.getElementById('roll_number').value.trim();
+                const department = document.getElementById('department').value.trim();
+                const year = document.getElementById('year').value;
+                const currentPassword = document.getElementById('current_password').value;
+
+                if (!fullName || !email || !rollNumber || !department || !year || !currentPassword) {
+                    e.preventDefault();
+                    alert('All required fields must be filled.');
+                    return false;
+                }
+
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    e.preventDefault();
+                    alert('Please enter a valid email address.');
+                    return false;
+                }
+
+                return confirm('Are you sure you want to update your profile?');
+            });
+        }
+
+        // Auto-hide success messages after 5 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                if (alert.classList.contains('alert-success')) {
+                    setTimeout(function() {
+                        alert.style.display = 'none';
+                    }, 5000);
+                }
+            });
+        });
+
+
+    });
     </script>
 </body>
 </html>
